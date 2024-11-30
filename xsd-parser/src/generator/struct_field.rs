@@ -11,6 +11,13 @@ pub trait StructFieldGenerator {
         if entity.type_modifiers.contains(&TypeModifier::Empty) {
             return "".into();
         }
+
+        if entity.type_name == "xs:anyType" {
+            // Return nothing for xs:anyType
+            // Later this could be a Option<xs:anyType> -> to Option<String>
+            return "".to_string();
+        }
+
         format!(
             "{comment}{macros}{indent}pub {name}: {typename},",
             comment = self.format_comment(entity, gen),
