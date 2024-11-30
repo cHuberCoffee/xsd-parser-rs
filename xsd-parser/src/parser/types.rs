@@ -174,7 +174,15 @@ pub struct Alias {
 }
 
 #[derive(Debug, Clone)]
+pub enum ImportType {
+    Import,
+    Include,
+}
+
+#[derive(Debug, Clone)]
 pub struct Import {
+    pub itype: ImportType,
+    pub prefix: Option<String>,
     pub name: String,
     pub location: String,
     pub comment: Option<String>,

@@ -43,7 +43,31 @@ impl<'input> Generator<'input> {
     pub fn generate_rs_file(&self, schema: &RsFile<'input>) -> String {
         *self.target_ns.borrow_mut() = schema.target_ns.clone();
         *self.xsd_ns.borrow_mut() = schema.xsd_ns.clone();
-        schema.types.iter().map(|entity| self.generate(entity)).collect()
+        let gen_code: String = schema.types.iter().map(|entity| self.generate(entity)).collect();
+
+        let fixed_includes = "use yaserde::{YaDeserialize, YaSerialize};\n\
+            use validate::Validate;";
+
+        let mut optional_includes: String = Default::default();
+        if gen_code.contains("xs::") {
+            // at least one built-in type found
+            optional_includes.push_str("use xsd_types::types as xs;\n");
+        }
+
+        if gen_code.contains("UtilsTupleIo")
+            || gen_code.contains("UtilsDefaultSerde")
+            || gen_code.contains("UtilsUnionSerDe")
+        {
+            // at least one element needs xsd_macro_utils
+            optional_includes.push_str("use xsd_macro_utils::*;\n");
+        }
+
+        if gen_code.contains("UtilsDefaultSerde") {
+            // the macro UtilsDefaultSerde needs use std::str::FromStr
+            optional_includes.push_str("use std::str::FromStr;\n");
+        }
+
+        format!("{fixed_includes}\n{optional_includes}\n{gen_code}")
     }
 
     pub fn generate(&self, entity: &RsEntity) -> String {

@@ -36,7 +36,7 @@ pub fn parse_node(node: &Node, parent: &Node) -> RsEntity {
         ComplexType => parse_complex_type(node, parent),
         Element => parse_element(node, parent),
         Extension(_) => parse_extension(node, parent),
-        Import | Include => parse_import(node),
+        Import | Include => parse_import(node, parent),
         List => parse_list(node),
         Restriction(_) => parse_restriction(node, parent),
         Sequence => parse_sequence(node, parent),
