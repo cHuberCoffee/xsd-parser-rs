@@ -70,11 +70,14 @@ pub trait EnumGenerator {
         match tns.as_ref() {
             Some(tn) => match tn.name() {
                 Some(name) => format!(
-                    "{derives}#[yaserde(prefix = \"{prefix}\", namespace = \"{prefix}: {uri}\")]\n",
+                    // needs to put it differently when multiples namespaces are defined.
+                    // namepsaces = {"tns" = "example.com", "tds = "another.example.com"}
+                    "{derives}#[yaserde(prefix = \"{prefix}\", namespaces = {{\"{prefix}\" = \"{uri}\"}})]\n",
                     derives = derives,
                     prefix = name,
                     uri = tn.uri()
                 ),
+                // deal with it
                 None => format!(
                     "{derives}#[yaserde(namespace = \"{uri}\")]\n",
                     derives = derives,
