@@ -1,8 +1,8 @@
 use std::{
-    fs,
-    fs::OpenOptions,
+    fs::{self, OpenOptions},
     io::{prelude::*, Read},
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use anyhow::Context;
@@ -62,6 +62,7 @@ fn process_single_file(input_path: &Path, output_path: Option<&Path>) -> anyhow:
     let code = gen.generate_rs_file(&rs_file);
     if let Some(output_filename) = output_path {
         write_to_file(output_filename, &code).context("Error writing file")?;
+        format_rust_file(output_filename)?;
     } else {
         println!("{}", code);
     }
@@ -78,4 +79,16 @@ fn load_file(path: &Path) -> std::io::Result<String> {
 fn write_to_file(path: &Path, text: &str) -> std::io::Result<()> {
     let mut file = OpenOptions::new().write(true).truncate(true).create(true).open(path)?;
     file.write_all(text.as_bytes())
+}
+
+fn format_rust_file(file_path: &Path) -> std::io::Result<()> {
+    let output = Command::new("rustfmt")
+        .arg(file_path) // Provide the file directly
+        .output()?; // Run rustfmt
+
+    if !output.status.success() {
+        eprintln!("rustfmt failed: {}", String::from_utf8_lossy(&output.stderr));
+    }
+
+    Ok(())
 }
