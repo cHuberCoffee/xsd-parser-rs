@@ -7,6 +7,7 @@ pub mod enum_case;
 pub mod import;
 pub mod r#struct;
 pub mod struct_field;
+pub mod toml;
 pub mod tuple_struct;
 mod utils;
 pub mod validator;
@@ -68,6 +69,10 @@ impl<'input> Generator<'input> {
         }
 
         format!("{fixed_includes}\n{optional_includes}\n{gen_code}")
+    }
+
+    pub fn generate_toml_file(&self, code: &String, pname: &str) -> String {
+        toml::generate_cargo_toml(code, pname)
     }
 
     pub fn generate(&self, entity: &RsEntity) -> String {

@@ -13,6 +13,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 Inflector = "0.11"
 roxmltree = "0.20"
+regex = "1"
 
 [dev-dependencies]
 num-bigint = "0.4"

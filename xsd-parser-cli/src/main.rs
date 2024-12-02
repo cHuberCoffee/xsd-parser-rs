@@ -60,8 +60,26 @@ fn process_single_file(input_path: &Path, output_path: Option<&Path>) -> anyhow:
     let rs_file = parse(text.as_str()).map_err(|_| anyhow::anyhow!("Error parsing file"))?;
     let gen = GeneratorBuilder::default().build();
     let code = gen.generate_rs_file(&rs_file);
+
+    let ofile_name = if let Some(crate_name) = output_path {
+        let ofile_name = crate_name
+            .to_str()
+            .expect("No output path set")
+            .split("/")
+            .last()
+            .expect("No output filename set");
+        ofile_name.replace(".rs", "")
+    } else {
+        panic!("Missing output file name");
+    };
+
+    let cargo_code = gen.generate_toml_file(&code, &ofile_name);
     if let Some(output_filename) = output_path {
+        let mut toml_output_filename = output_filename.to_path_buf();
+        toml_output_filename.set_extension("toml");
         write_to_file(output_filename, &code).context("Error writing file")?;
+        write_to_file(&toml_output_filename.as_path(), &cargo_code)
+            .context("Error writeing file")?;
         format_rust_file(output_filename)?;
     } else {
         println!("{}", code);
