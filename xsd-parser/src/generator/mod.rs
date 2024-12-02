@@ -72,7 +72,8 @@ impl<'input> Generator<'input> {
     }
 
     pub fn generate_toml_file(&self, code: &String, pname: &str) -> String {
-        toml::generate_cargo_toml(code, pname)
+        let pname_replace = pname.replace("-", "_");
+        toml::generate_cargo_toml(code, &pname_replace)
     }
 
     pub fn generate(&self, entity: &RsEntity) -> String {

@@ -24,7 +24,7 @@ pub trait StructFieldGenerator {
             macros = self.macros(entity, gen),
             indent = gen.base().indent(),
             name = self.get_name(entity, gen),
-            typename = self.get_type_name(entity, gen),
+            typename = self.get_type_name(entity, gen).replace("-", "_"),
         )
     }
 
