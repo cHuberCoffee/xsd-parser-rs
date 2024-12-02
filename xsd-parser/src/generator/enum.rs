@@ -62,7 +62,7 @@ pub trait EnumGenerator {
 
     fn macros(&self, entity: &Enum, gen: &Generator) -> Cow<'static, str> {
         if entity.source == EnumSource::Union {
-            return "#[derive(PartialEq, Debug, UtilsUnionSerDe)]\n".into();
+            return "#[derive(PartialEq, Clone, Debug, UtilsUnionSerDe)]\n".into();
         }
 
         let derives = "#[derive(PartialEq, Debug, Clone, YaSerialize, YaDeserialize)]\n";
