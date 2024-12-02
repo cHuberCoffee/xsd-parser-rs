@@ -11,12 +11,14 @@ edition = "2021"
 "#;
 
 pub fn generate_cargo_toml(code: &String, pname: &str) -> String {
-    let mut dep: Vec<(String, String)> = vec![(
-        "yaserde".to_string(),
-        "{ version = \"0.12\", features = [\"derive\"] }".to_string(),
-    )];
-
-    if code.contains("UtilsDefaultSerde") {
+    let mut dep: Vec<(String, String)> = vec![
+        ("yaserde".to_string(), "{ version = \"0.12\", features = [\"derive\"] }".to_string()),
+        ("validate".to_string(), "{ path = \"../../validate\" }".to_string()),
+    ];
+    if code.contains("UtilsTupleIo")
+        || code.contains("UtilsDefaultSerde")
+        || code.contains("UtilsUnionSerDe")
+    {
         dep.push(("xml-rs".to_string(), "\"0.8\"".to_string()));
     }
 
@@ -34,13 +36,14 @@ pub fn generate_cargo_toml(code: &String, pname: &str) -> String {
         .collect();
 
     for cn in crate_names {
-        if cn.contains("xsd_") {
+        let mcn = cn.replace("_", "-");
+        if mcn.contains("xsd-") {
             dep.push((
-                cn.to_string(),
+                mcn.to_string(),
                 format!(" {{ git = \"https://github.com/lumeohq/xsd-parser-rs\" }}"),
             ));
         } else {
-            dep.push((cn.to_string(), format!(" {{ path = \"./../{}\" }}", cn)));
+            dep.push((mcn.to_string(), format!(" {{ path = \"./../{}\" }}", mcn)));
         }
     }
 
