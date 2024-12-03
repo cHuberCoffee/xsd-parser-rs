@@ -16,7 +16,7 @@ pub trait ImportGenerator {
             ImportType::Import => {
                 if entity.prefix == None {
                     if entity.location == "http://www.w3.org/2001/xml.xsd" {
-                        return format!("use xml as xml;\n");
+                        return format!("use xml_ns as xml;\n");
                     }
                 }
 
