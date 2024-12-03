@@ -2,9 +2,12 @@ use crate::{generator::Generator, parser::types::Alias};
 
 pub trait AliasGenerator {
     fn generate(&self, entity: &Alias, gen: &Generator) -> String {
+        if entity.original.split(":").any(|part| part == entity.name) {
+            return "".to_string();
+        }
         format!(
-            "//{comment} pub type {name} = {original};\n",
-            comment = self.format_comment(entity.comment.as_deref(), gen),
+            "pub type {name} = {original};\n",
+            // comment = self.format_comment(entity.comment.as_deref(), gen),
             name = self.format_name(entity.name.as_str(), gen),
             original = self.format_original_type(entity.original.as_str(), gen)
         )
