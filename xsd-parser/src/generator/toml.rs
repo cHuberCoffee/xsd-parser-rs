@@ -22,6 +22,13 @@ pub fn generate_cargo_toml(code: &String, pname: &str) -> String {
         dep.push(("xml-rs".to_string(), "\"0.8\"".to_string()));
     }
 
+    if code.contains("UtilsDefaultSerde") {
+        dep.push((
+            "xsd-types".to_string(),
+            " { git = \"https://github.com/lumeohq/xsd-parser-rs\" }".to_string(),
+        ));
+    }
+
     let use_lines = code
         .lines()
         .filter(|line| line.starts_with("use") || line.starts_with("pub use"))
@@ -37,6 +44,12 @@ pub fn generate_cargo_toml(code: &String, pname: &str) -> String {
 
     for cn in crate_names {
         let mcn = cn.replace("_", "-");
+
+        // filter for possilbe double occurence
+        if dep.iter().any(|(f, _)| *f == mcn) {
+            continue;
+        }
+
         if mcn.contains("xsd-") {
             dep.push((
                 mcn.to_string(),
