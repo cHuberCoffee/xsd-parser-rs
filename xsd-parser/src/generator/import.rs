@@ -8,16 +8,16 @@ pub trait ImportGenerator {
         // include: pub use <name>::*;
         // import : use <name> as <prefix>;
 
-        if entity.prefix == None {
-            return "".to_string();
-        }
-
         let crate_name = prepare_create_name(&entity.location);
         match entity.itype {
             ImportType::Include => {
                 format!("pub use {}::*;\n", crate_name)
             }
             ImportType::Import => {
+                if entity.prefix == None {
+                    return "".to_string();
+                }
+
                 format!(
                     "use {} as {};\n",
                     crate_name,
