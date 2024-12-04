@@ -44,12 +44,14 @@ impl<'input> Generator<'input> {
     pub fn generate_rs_file(&self, schema: &RsFile<'input>) -> String {
         *self.target_ns.borrow_mut() = schema.target_ns.clone();
         *self.xsd_ns.borrow_mut() = schema.xsd_ns.clone();
-        let gen_code: String = schema.types.iter().map(|entity| self.generate(entity)).collect();
+        let mut gen_code: String =
+            schema.types.iter().map(|entity| self.generate(entity)).collect();
 
         let includes = Generator::generate_includes(&gen_code);
-        let updated_code = Generator::alias_primitive_replacement(&gen_code);
+        gen_code = Generator::alias_primitive_replacement(&gen_code);
+        gen_code = Generator::unused_use_removal(&gen_code);
 
-        format!("{includes}\n{updated_code}")
+        format!("{includes}\n{gen_code}")
     }
 
     pub fn generate_toml_file(&self, code: &String, pname: &str) -> String {
@@ -121,9 +123,33 @@ impl<'input> Generator<'input> {
         for a in aliases {
             let cleand_line = a.replace("pub type", "").replace(" ", "").replace(";", "");
             let alias_from_to: Vec<&str> = cleand_line.split("=").collect();
+
+            if alias_from_to.len() != 2 {
+                continue;
+            }
+
             updated_code = updated_code.replace(a, "").replace(alias_from_to[0], alias_from_to[1]);
         }
         updated_code
+    }
+
+    fn unused_use_removal(gen_code: &String) -> String {
+        let mut clean_code = gen_code.clone();
+        let use_lines = gen_code.lines().filter(|l| l.contains("use ") && l.contains(" as "));
+        for ul in use_lines {
+            let include =
+                ul.replace("use", "").replace("as", "=").replace(";", "").replace(" ", "");
+            let include_split: Vec<&str> = include.split("=").collect();
+
+            if include_split.len() != 2 {
+                continue;
+            }
+
+            if !clean_code.lines().filter(|l| *l != ul).any(|l| l.contains(include_split[1])) {
+                clean_code = clean_code.replace(ul, "");
+            }
+        }
+        clean_code
     }
 }
 
