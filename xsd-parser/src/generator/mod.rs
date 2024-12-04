@@ -46,29 +46,10 @@ impl<'input> Generator<'input> {
         *self.xsd_ns.borrow_mut() = schema.xsd_ns.clone();
         let gen_code: String = schema.types.iter().map(|entity| self.generate(entity)).collect();
 
-        let fixed_includes = "use yaserde::{YaDeserialize, YaSerialize};\n\
-            use validate::Validate;";
+        let includes = Generator::generate_includes(&gen_code);
+        let updated_code = Generator::alias_primitive_replacement(&gen_code);
 
-        let mut optional_includes: String = Default::default();
-        if gen_code.contains("xs::") {
-            // at least one built-in type found
-            optional_includes.push_str("use xsd_types::types as xs;\n");
-        }
-
-        if gen_code.contains("UtilsTupleIo")
-            || gen_code.contains("UtilsDefaultSerde")
-            || gen_code.contains("UtilsUnionSerDe")
-        {
-            // at least one element needs xsd_macro_utils
-            optional_includes.push_str("use xsd_macro_utils::*;\n");
-        }
-
-        if gen_code.contains("UtilsDefaultSerde") {
-            // the macro UtilsDefaultSerde needs use std::str::FromStr
-            optional_includes.push_str("use std::str::FromStr;\n");
-        }
-
-        format!("{fixed_includes}\n{optional_includes}\n{gen_code}")
+        format!("{includes}\n{updated_code}")
     }
 
     pub fn generate_toml_file(&self, code: &String, pname: &str) -> String {
@@ -98,6 +79,51 @@ impl<'input> Generator<'input> {
 
     pub fn enum_case_gen(&self) -> &dyn EnumCaseGenerator {
         self.enum_case_gen.as_ref().unwrap().borrow()
+    }
+
+    fn generate_includes(gen_code: &String) -> String {
+        let fixed_includes = "use yaserde::{YaDeserialize, YaSerialize};\n\
+            use validate::Validate;";
+
+        let mut optional_includes: String = Default::default();
+        if gen_code.contains("xs::") {
+            // at least one built-in type found
+            optional_includes.push_str("use xsd_types::types as xs;\n");
+        }
+
+        if gen_code.contains("UtilsTupleIo")
+            || gen_code.contains("UtilsDefaultSerde")
+            || gen_code.contains("UtilsUnionSerDe")
+        {
+            // at least one element needs xsd_macro_utils
+            optional_includes.push_str("use xsd_macro_utils::*;\n");
+        }
+
+        if gen_code.contains("UtilsDefaultSerde") {
+            // the macro UtilsDefaultSerde needs use std::str::FromStr
+            optional_includes.push_str("use std::str::FromStr;\n");
+        }
+
+        format!("{fixed_includes}\n{optional_includes}")
+    }
+
+    fn alias_primitive_replacement(gen_code: &String) -> String {
+        let primitive_types = [
+            "bool", "char", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64",
+            "i128", "isize", "f32", "f64", "String", "&str",
+        ];
+        let aliases = gen_code
+            .lines()
+            .filter(|l| l.contains("pub type"))
+            .filter(|a| primitive_types.iter().any(|ty| a.contains(ty)));
+
+        let mut updated_code = gen_code.clone();
+        for a in aliases {
+            let cleand_line = a.replace("pub type", "").replace(" ", "").replace(";", "");
+            let alias_from_to: Vec<&str> = cleand_line.split("=").collect();
+            updated_code = updated_code.replace(a, "").replace(alias_from_to[0], alias_from_to[1]);
+        }
+        updated_code
     }
 }
 
