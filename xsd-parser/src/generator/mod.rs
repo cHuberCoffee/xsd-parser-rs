@@ -27,6 +27,7 @@ use crate::{
 
 #[derive(Default)]
 pub struct Generator<'input> {
+    pub schema: RefCell<RsFile<'input>>,
     pub target_ns: RefCell<Option<Namespace<'input>>>,
     pub xsd_ns: RefCell<Option<Namespace<'input>>>,
 
@@ -42,6 +43,7 @@ pub struct Generator<'input> {
 
 impl<'input> Generator<'input> {
     pub fn generate_rs_file(&self, schema: &RsFile<'input>) -> String {
+        *self.schema.borrow_mut() = schema.clone();
         *self.target_ns.borrow_mut() = schema.target_ns.clone();
         *self.xsd_ns.borrow_mut() = schema.xsd_ns.clone();
         let mut gen_code: String =

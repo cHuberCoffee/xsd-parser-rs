@@ -63,6 +63,24 @@ pub trait EnumCaseGenerator {
             }
         }
     }
+
+    fn from_string_entities(&self, parent_name: &str, entity: &EnumCase) -> String {
+        format!(
+            "\"{estring}\" => Ok({pname}::{ecase}),",
+            estring = entity.value,
+            pname = parent_name,
+            ecase = entity.name
+        )
+    }
+
+    fn fmt_string_entities(&self, parent_name: &str, entity: &EnumCase) -> String {
+        format!(
+            "{pname}::{ecase} => write!(f, \"{estring}\"),",
+            pname = parent_name,
+            ecase = entity.name,
+            estring = entity.value
+        )
+    }
 }
 
 pub struct DefaultEnumCaseGen;
