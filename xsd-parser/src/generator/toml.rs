@@ -10,10 +10,15 @@ edition = "2021"
 {pdependencies}
 "#;
 
-pub fn generate_cargo_toml(code: &String, pname: &str) -> String {
+pub enum FileType {
+    Wsdl,
+    Xsd,
+}
+
+pub fn generate_cargo_toml(code: &String, pname: &str, ftype: FileType) -> String {
     let mut dep: Vec<(String, String)> = vec![
         ("yaserde".to_string(), "{ version = \"0.12\", features = [\"derive\"] }".to_string()),
-        ("validate".to_string(), "{ path = \"../../validate\" }".to_string()),
+        ("validate".to_string(), "{ path = \"./../../validate\" }".to_string()),
     ];
     if code.contains("UtilsTupleIo")
         || code.contains("UtilsDefaultSerde")
@@ -56,7 +61,14 @@ pub fn generate_cargo_toml(code: &String, pname: &str) -> String {
                 format!(" {{ git = \"https://github.com/lumeohq/xsd-parser-rs\" }}"),
             ));
         } else {
-            dep.push((mcn.to_string(), format!(" {{ path = \"./../{}\" }}", mcn)));
+            match ftype {
+                FileType::Xsd => {
+                    dep.push((mcn.to_string(), format!(" {{ path = \"./../{}\" }}", mcn)))
+                }
+                FileType::Wsdl => {
+                    dep.push((mcn.to_string(), format!(" {{ path = \"./../../xsd_rs/{}\" }}", mcn)))
+                }
+            }
         }
     }
 

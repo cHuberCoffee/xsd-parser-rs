@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::Context;
 use clap::Parser;
-use xsd_parser::{generator::builder::GeneratorBuilder, parser::parse};
+use xsd_parser::{generator::{self, builder::GeneratorBuilder}, parser::parse};
 
 #[derive(Parser)]
 #[clap(name = env!("CARGO_PKG_NAME"))]
@@ -73,7 +73,7 @@ fn process_single_file(input_path: &Path, output_path: Option<&Path>) -> anyhow:
         panic!("Missing output file name");
     };
 
-    let cargo_code = gen.generate_toml_file(&code, &ofile_name);
+    let cargo_code = gen.generate_toml_file(&code, &ofile_name, generator::toml::FileType::Xsd);
     if let Some(output_filename) = output_path {
         let mut toml_output_filename = output_filename.to_path_buf();
         toml_output_filename.set_extension("toml");

@@ -2,13 +2,14 @@ use std::{
     fs,
     io::{prelude::*, Read},
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use anyhow::Context;
 use clap::Parser;
 use roxmltree::{Document, Node};
 use wsdl_parser::{generator::generate, parser::definitions::Definitions};
-use xsd_parser::{generator::builder::GeneratorBuilder, parser::schema::parse_schema};
+use xsd_parser::{generator::{self, builder::GeneratorBuilder}, parser::schema::parse_schema};
 
 #[derive(Parser)]
 #[clap(name = env!("CARGO_PKG_NAME"))]
@@ -69,8 +70,28 @@ fn process_single_file(input_path: &Path, output_path: Option<&Path>) -> anyhow:
 
     code.push(generate(&definitions));
     let code = code.join("");
+
+    let ofile_name = if let Some(crate_name) = output_path {
+        let ofile_name = crate_name
+            .to_str()
+            .expect("No output path set")
+            .split("/")
+            .last()
+            .expect("No output filename set");
+        ofile_name.replace(".rs", "")
+    } else {
+        panic!("Missing output file name");
+    };
+
+    let cargo_code = gen.generate_toml_file(&code, &ofile_name, generator::toml::FileType::Wsdl);
+
     if let Some(output_filename) = output_path {
+        let mut toml_output_filename = output_filename.to_path_buf();
+        toml_output_filename.set_extension("toml");
         write_to_file(output_filename, &code).context("Error writing file")?;
+        write_to_file(&toml_output_filename.as_path(), &cargo_code)?;
+
+        format_rust_file(output_filename)?;
     } else {
         println!("{}", code);
     }
@@ -87,6 +108,20 @@ fn load_file(path: &Path) -> std::io::Result<String> {
 fn write_to_file(path: &Path, text: &str) -> std::io::Result<()> {
     let mut file = fs::File::create(path)?;
     file.write_all(text.as_bytes())?;
+
+    Ok(())
+}
+
+fn format_rust_file(file_path: &Path) -> std::io::Result<()> {
+    let output = Command::new("rustfmt")
+        .arg("--edition")
+        .arg("2021")
+        .arg(file_path) // Provide the file directly
+        .output()?; // Run rustfmt
+
+    if !output.status.success() {
+        eprintln!("rustfmt failed: {}", String::from_utf8_lossy(&output.stderr));
+    }
 
     Ok(())
 }
