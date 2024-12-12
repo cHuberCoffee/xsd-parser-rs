@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, str::FromStr};
 
 use inflector::cases::{pascalcase::to_pascal_case, snakecase::to_snake_case};
 use roxmltree::Namespace;
@@ -6,6 +6,24 @@ use roxmltree::Namespace;
 use crate::{generator::function::Function, parser::definitions::Definitions};
 
 pub mod function;
+
+#[derive(Debug, PartialEq)]
+pub enum CodeType {
+    Client,
+    Server,
+}
+
+impl FromStr for CodeType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "c" => Ok(CodeType::Client),
+            "s" => Ok(CodeType::Server),
+            _ => Err("<c, s>, c ClientCode, s ServerCode".into()),
+        }
+    }
+}
 
 pub fn generate(definitions: &Definitions) -> String {
     let mut res = vec![];

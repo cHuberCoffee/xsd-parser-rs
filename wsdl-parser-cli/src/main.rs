@@ -8,7 +8,7 @@ use std::{
 use anyhow::Context;
 use clap::Parser;
 use roxmltree::{Document, Node};
-use wsdl_parser::{generator::generate, parser::definitions::Definitions};
+use wsdl_parser::{generator::generate, generator::CodeType, parser::definitions::Definitions};
 use xsd_parser::{generator::{self, builder::GeneratorBuilder}, parser::schema::parse_schema};
 
 #[derive(Parser)]
@@ -23,6 +23,10 @@ struct Opt {
     /// Output file
     #[clap(long, short)]
     output: Option<PathBuf>,
+
+    /// CodeType
+    #[clap(long, short)]
+    codetype: String,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -30,11 +34,13 @@ fn main() -> anyhow::Result<()> {
 
     let input_path = opt.input.unwrap_or_else(|| PathBuf::from("input/wsdl"));
     let md = fs::metadata(&input_path).unwrap();
+
+    let codetype = opt.codetype.parse().map_err(|e| anyhow::anyhow!("{}", e))?;
     if md.is_dir() {
         let output_path = opt.output.unwrap_or_else(|| PathBuf::from("output/wsdl-rs"));
         process_dir(&input_path, &output_path)?;
     } else {
-        process_single_file(&input_path, opt.output.as_deref())?;
+        process_single_file(&input_path, opt.output.as_deref(), codetype)?;
     }
 
     Ok(())
@@ -52,13 +58,13 @@ fn process_dir(input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
         } else {
             let output_file_path = PathBuf::from(path.file_name().unwrap()).with_extension("rs");
             let output_file_path = output_path.join(output_file_path);
-            process_single_file(&path, Some(&output_file_path))?;
+            process_single_file(&path, Some(&output_file_path), CodeType::Client)?;
         }
     }
     Ok(())
 }
 
-fn process_single_file(input_path: &Path, output_path: Option<&Path>) -> anyhow::Result<()> {
+fn process_single_file(input_path: &Path, output_path: Option<&Path>, code_type:CodeType) -> anyhow::Result<()> {
     let text = load_file(input_path)?;
     let doc = Document::parse(text.as_str()).context("Failed to parse input document")?;
     let definitions = Definitions::new(&doc.root_element());
