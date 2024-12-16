@@ -5,11 +5,16 @@ use std::{
     process::Command,
 };
 
-use anyhow::Context;
 use clap::Parser;
 use roxmltree::{Document, Node};
-use wsdl_parser::{generator::generate, generator::CodeType, parser::definitions::Definitions};
-use xsd_parser::{generator::{self, builder::GeneratorBuilder}, parser::schema::parse_schema};
+use wsdl_parser::{
+    generator::{generate, generate_dispatcher, generate_impl_template, CodeType},
+    parser::definitions::Definitions,
+};
+use xsd_parser::{
+    generator::{self, builder::GeneratorBuilder},
+    parser::schema::parse_schema,
+};
 
 #[derive(Parser)]
 #[clap(name = env!("CARGO_PKG_NAME"))]
@@ -18,91 +23,120 @@ use xsd_parser::{generator::{self, builder::GeneratorBuilder}, parser::schema::p
 struct Opt {
     /// Input .wsdl file
     #[clap(long, short)]
-    input: Option<PathBuf>,
+    input: PathBuf,
 
-    /// Output file
+    /// Output path
     #[clap(long, short)]
-    output: Option<PathBuf>,
+    output: PathBuf,
 
-    /// CodeType
+    /// Code Type
     #[clap(long, short)]
     codetype: String,
+
+    /// Module Name
+    #[clap(long, short)]
+    modulename: String,
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<(), String> {
     let opt: Opt = Opt::parse();
 
-    let input_path = opt.input.unwrap_or_else(|| PathBuf::from("input/wsdl"));
-    let md = fs::metadata(&input_path).unwrap();
+    let input_file = opt.input;
+    let output_path = opt.output;
 
-    let codetype = opt.codetype.parse().map_err(|e| anyhow::anyhow!("{}", e))?;
-    if md.is_dir() {
-        let output_path = opt.output.unwrap_or_else(|| PathBuf::from("output/wsdl-rs"));
-        process_dir(&input_path, &output_path)?;
-    } else {
-        process_single_file(&input_path, opt.output.as_deref(), codetype)?;
+    let i_md = fs::metadata(&input_file).map_err(|op| format!("{op}"))?;
+    let o_md = fs::metadata(&output_path).map_err(|op| format!("{op}"))?;
+
+    let codetype: CodeType = opt.codetype.parse()?;
+    let module = opt.modulename;
+
+    if i_md.is_dir() {
+        return Err("Input is not a file".into());
     }
 
+    if !o_md.is_dir() {
+        return Err("Ouput is not a path".into());
+    }
+
+    process_single_file(&input_file, &output_path, codetype, &module)?;
     Ok(())
 }
 
-//TODO: Add a common mechanism for working with files
-fn process_dir(input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
-    if !output_path.exists() {
-        fs::create_dir_all(output_path)?;
-    }
-    for entry in fs::read_dir(input_path)? {
-        let path = entry?.path();
-        if path.is_dir() {
-            process_dir(&path, &output_path.join(path.file_name().unwrap()))?;
-        } else {
-            let output_file_path = PathBuf::from(path.file_name().unwrap()).with_extension("rs");
-            let output_file_path = output_path.join(output_file_path);
-            process_single_file(&path, Some(&output_file_path), CodeType::Client)?;
-        }
-    }
-    Ok(())
-}
-
-fn process_single_file(input_path: &Path, output_path: Option<&Path>, code_type:CodeType) -> anyhow::Result<()> {
-    let text = load_file(input_path)?;
-    let doc = Document::parse(text.as_str()).context("Failed to parse input document")?;
+fn process_single_file(
+    input_file: &PathBuf,
+    output_path: &PathBuf,
+    ct: CodeType,
+    modname: &str,
+) -> Result<(), String> {
+    let text = load_file(input_file).map_err(|e| format!("{e}"))?;
+    let doc = Document::parse(text.as_str()).map_err(|e| format!("{e}"))?;
     let definitions = Definitions::new(&doc.root_element());
     let gen = GeneratorBuilder::default().build();
-    let schemas =
+
+    let schema =
         definitions.types().iter().flat_map(|t| t.schemas()).collect::<Vec<Node<'_, '_>>>();
-    let mut code =
-        schemas.iter().map(|f| gen.generate_rs_file(&parse_schema(f))).collect::<Vec<String>>();
 
-    code.push(generate(&definitions));
-    let code = code.join("");
+    let schema_code =
+        schema.iter().map(|f| gen.generate_rs_file(&parse_schema(f))).collect::<Vec<String>>();
 
-    let ofile_name = if let Some(crate_name) = output_path {
-        let ofile_name = crate_name
-            .to_str()
-            .expect("No output path set")
-            .split("/")
-            .last()
-            .expect("No output filename set");
-        ofile_name.replace(".rs", "")
+    let (code, impl_block, dispatcher) = if ct == CodeType::Client {
+        let client_code = generate(&definitions);
+        let mut client_file = schema_code.clone();
+        client_file.push(client_code);
+
+        (client_file.join(""), None, None)
     } else {
-        panic!("Missing output file name");
+        let impl_block = generate_impl_template(&definitions, modname);
+        let dispatcher = generate_dispatcher(&definitions, modname);
+
+        (schema_code.join(""), Some(impl_block), Some(dispatcher))
     };
 
-    let cargo_code = gen.generate_toml_file(&code, &ofile_name, generator::toml::FileType::Wsdl);
+    let cargo = gen.generate_toml_file(&code, modname, generator::toml::FileType::Wsdl);
 
-    if let Some(output_filename) = output_path {
-        let mut toml_output_filename = output_filename.to_path_buf();
-        toml_output_filename.set_extension("toml");
-        write_to_file(output_filename, &code).context("Error writing file")?;
-        write_to_file(&toml_output_filename.as_path(), &cargo_code)?;
-
-        format_rust_file(output_filename)?;
+    let (cargofn, codefn, implfn, dispatcherfn) = if ct == CodeType::Client {
+        let mut cargofn = output_path.clone();
+        let mut codefn = output_path.clone();
+        cargofn.push(format!("{modname}.toml"));
+        codefn.push(format!("{modname}.rs"));
+        (cargofn, codefn, None, None)
     } else {
-        println!("{}", code);
+        let mut cargofn = output_path.clone();
+        let mut codefn = output_path.clone();
+        let mut implfn = output_path.clone();
+        let mut dispatcherfn = output_path.clone();
+        cargofn.push(format!("{modname}.toml"));
+        codefn.push(format!("{modname}.rs"));
+        implfn.push(format!("{modname}_impl.rs"));
+        dispatcherfn.push(format!("{modname}_dispatcher.rs"));
+        (cargofn, codefn, Some(implfn), Some(dispatcherfn))
+    };
+
+    write_to_file(&cargofn.as_path(), &cargo).map_err(|e| format!("{e}"))?;
+    write_to_file(&codefn.as_path(), &code).map_err(|e| format!("{e}"))?;
+
+    format_rust_file(&codefn).map_err(|e| format!("{e}"))?;
+    if implfn.is_some() {
+        write_to_file(
+            &implfn.clone().ok_or(format!("Missing impl block filename"))?.as_path(),
+            &impl_block.ok_or(format!("Missing impl block code"))?,
+        )
+        .map_err(|e| format!("{e}"))?;
+        format_rust_file(&implfn.unwrap().as_path()).map_err(|e| format!("{e}"))?;
     }
+
+    if dispatcherfn.is_some() {
+        write_to_file(
+            &dispatcherfn.clone().ok_or(format!("Missing dispatcher filename"))?.as_path(),
+            &dispatcher.ok_or(format!("Missing dispatcher code"))?,
+        )
+        .map_err(|e| format!("{e}"))?;
+        format_rust_file(&dispatcherfn.unwrap().as_path()).map_err(|e| format!("{e}"))?;
+    }
+
     Ok(())
 }
+
 
 fn load_file(path: &Path) -> std::io::Result<String> {
     let mut file = fs::File::open(path)?;
