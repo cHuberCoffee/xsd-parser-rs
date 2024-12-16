@@ -37,6 +37,71 @@ pub fn generate(definitions: &Definitions) -> String {
     res.join("")
 }
 
+pub fn generate_impl_template(definitions: &Definitions, endpoint: &str) -> String {
+    let mut impl_blocks: Vec<String> = vec![];
+    for port_type in definitions.port_types().values() {
+        for operation in port_type.operations() {
+            let func = Function::new(operation, definitions);
+            impl_blocks.push(format!(
+                "impl MsgHandler for schema::{ep}::{funcname} {{\n\
+                // fn handler(&self) -> Result<String, String> {{\n\
+                // FILL IN IMPLEMENTATION\n\
+                // }}\n\
+                }}\n",
+                ep = endpoint,
+                funcname = &func.name
+            ));
+        }
+    }
+
+    let impl_blocks = impl_blocks.join("\n");
+    format!(
+        "pub trait MsgHandler {{\n\
+    fn handler(&self) -> Result<String, String> {{\n\
+    Err(format!(\"Method {ep} not implemented\"))\n\
+    }}\n\
+    }}\n\
+    {impl_blocks}",
+        ep = endpoint,
+        impl_blocks = impl_blocks
+    )
+}
+
+pub fn generate_dispatcher(definitions: &Definitions, endpoint: &str) -> String {
+    let mut cases: Vec<String> = vec![];
+    for port_type in definitions.port_types().values() {
+        for operation in port_type.operations() {
+            let func = Function::new(operation, definitions);
+
+            cases.push(format!(
+                "\"{funcname}\" => {{\n\
+            from_str::<schema::{ep}::{funcname}>(app_data)\n\
+            .map(|data| Box::new(data) as Box<dyn implementation::MsgHandler>)\n\
+            .map_err(|e| format!(\"YaDeserialize: {{e}}\"))\n\
+            }}\n",
+                ep = endpoint,
+                funcname = &func.name
+            ));
+        }
+    }
+
+    let match_cases = cases.join("");
+    format!(
+        "use yaserde::de::from_str;\n\
+    use super::implementation;\n\
+    pub fn dispatcher(\n\
+    app_data: &str,\n\
+    method: &str\n\
+    ) -> Result<Box<dyn implementation::MsgHandler>, String> {{\n\
+    match method {{\n\
+    {match_cases}\n\
+    _ => Err(format!(\"{{}} method not found\", method))\n\
+    }}\n\
+    }}",
+        match_cases = match_cases
+    )
+}
+
 const REQUEST_FUNC_BODY: &str = "transport::request(transport, request).await";
 
 fn generate_function(func: &Function<'_>, target_ns: Option<&Namespace>) -> String {
