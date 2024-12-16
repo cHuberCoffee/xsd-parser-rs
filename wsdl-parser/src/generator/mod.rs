@@ -37,69 +37,65 @@ pub fn generate(definitions: &Definitions) -> String {
     res.join("")
 }
 
+const IMPL_HEAD: &str = "pub trait MsgHandler {
+\tfn handler(&self) -> Result<String, String> {
+\t\tErr(format!(\"Method {endp} not implemented\"))
+\t}
+}";
+
+const IMPL_BLOCK: &str = "impl MsgHandler for schema::{endp}::{funcname} {
+\t//fn handler(&self) -> Result<String, String> {
+\t\t// FILL IN IMPLEMENTATION
+\t//}
+}\n";
+
 pub fn generate_impl_template(definitions: &Definitions, endpoint: &str) -> String {
     let mut impl_blocks: Vec<String> = vec![];
     for port_type in definitions.port_types().values() {
         for operation in port_type.operations() {
             let func = Function::new(operation, definitions);
-            impl_blocks.push(format!(
-                "impl MsgHandler for schema::{ep}::{funcname} {{\n\
-                // fn handler(&self) -> Result<String, String> {{\n\
-                // FILL IN IMPLEMENTATION\n\
-                // }}\n\
-                }}\n",
-                ep = endpoint,
-                funcname = &func.name
-            ));
+            impl_blocks.push(
+                IMPL_BLOCK
+                    .replace("{endp}", endpoint)
+                    .replace("{funcname}", &func.name)
+                    .to_string(),
+            );
         }
     }
 
-    let impl_blocks = impl_blocks.join("\n");
-    format!(
-        "pub trait MsgHandler {{\n\
-    fn handler(&self) -> Result<String, String> {{\n\
-    Err(format!(\"Method {ep} not implemented\"))\n\
-    }}\n\
-    }}\n\
-    {impl_blocks}",
-        ep = endpoint,
-        impl_blocks = impl_blocks
-    )
+    let head = IMPL_HEAD.replace("{endp}", endpoint);
+    format!("{head}{blocks}", head = head, blocks = impl_blocks.join("\n"))
 }
+
+const DISP_HEAD: &str = "use yaserde::de::from_str;
+use super::implementation;
+
+pub fn dispatcher(
+\tapp_data: &str,
+\tmethod: &str,
+) -> Result<Box<dyn implementation::MsgHandler>, String> {
+\tmatch method {
+{cases}
+\t\t_ => Err(format!(\"{} method not found\", method)),
+\t}
+}";
+
+const DISP_CASE: &str = "\t\t\"{funcname}\" => from_str::<schema::{endp}::{funcname}>(app_data)
+\t\t\t.map(|data| Box::new(data) as Box<dyn implementation::MsgHandler>)
+\t\t\t.map_err(|e| format!(\"YaDeserialize: {e}\")),";
 
 pub fn generate_dispatcher(definitions: &Definitions, endpoint: &str) -> String {
     let mut cases: Vec<String> = vec![];
     for port_type in definitions.port_types().values() {
         for operation in port_type.operations() {
             let func = Function::new(operation, definitions);
-
-            cases.push(format!(
-                "\"{funcname}\" => {{\n\
-            from_str::<schema::{ep}::{funcname}>(app_data)\n\
-            .map(|data| Box::new(data) as Box<dyn implementation::MsgHandler>)\n\
-            .map_err(|e| format!(\"YaDeserialize: {{e}}\"))\n\
-            }}\n",
-                ep = endpoint,
-                funcname = &func.name
-            ));
+            cases.push(
+                DISP_CASE.replace("{endp}", endpoint).replace("{funcname}", func.name).to_string(),
+            );
         }
     }
 
-    let match_cases = cases.join("");
-    format!(
-        "use yaserde::de::from_str;\n\
-    use super::implementation;\n\
-    pub fn dispatcher(\n\
-    app_data: &str,\n\
-    method: &str\n\
-    ) -> Result<Box<dyn implementation::MsgHandler>, String> {{\n\
-    match method {{\n\
-    {match_cases}\n\
-    _ => Err(format!(\"{{}} method not found\", method))\n\
-    }}\n\
-    }}",
-        match_cases = match_cases
-    )
+    format!("{head}", head = DISP_HEAD.replace("{cases}", &cases.join("")))
 }
 
 const REQUEST_FUNC_BODY: &str = "transport::request(transport, request).await";
