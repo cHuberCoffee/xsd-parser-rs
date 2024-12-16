@@ -41,7 +41,7 @@ const IMPL_HEAD: &str = "pub trait MsgHandler {
 \tfn handler(&self) -> Result<String, String> {
 \t\tErr(format!(\"Method {endp} not implemented\"))
 \t}
-}";
+}\n\n";
 
 const IMPL_BLOCK: &str = "impl MsgHandler for schema::{endp}::{funcname} {
 \t//fn handler(&self) -> Result<String, String> {
