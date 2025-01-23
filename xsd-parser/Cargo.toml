@@ -22,4 +22,4 @@ text-diff = "0.4"
 xml-rs = "0.8"
 xsd-macro-utils = { path = "../xsd-macro-utils" }
 xsd-types = { path = "../xsd-types" }
-yaserde = { version = "0.12", features = ["derive"] }
+yaserde = { git = "https://github.com/cHuberCoffee/yaserde.git", branch = "enum_namespace_fix", features = ["derive"] }

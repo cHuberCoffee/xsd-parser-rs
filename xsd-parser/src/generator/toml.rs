@@ -10,6 +10,9 @@ edition = "2021"
 {pdependencies}
 "#;
 
+const YASERDE_PFORK_DEP: &str = "{ git = \"https://github.com/cHuberCoffee/yaserde.git\", branch = \"enum_namespace_fix\", features = [\"derive\"] }";
+const XSD_PARSER_PFORK_DEP: &str = "{ git = \"https://github.com/cHuberCoffee/xsd-parser-rs.git\", branch = \"use_pfork_yaserde\" }";
+
 pub enum FileType {
     Wsdl,
     Xsd,
@@ -17,7 +20,7 @@ pub enum FileType {
 
 pub fn generate_cargo_toml(code: &String, pname: &str, ftype: FileType) -> String {
     let mut dep: Vec<(String, String)> = vec![
-        ("yaserde".to_string(), "{ version = \"0.12\", features = [\"derive\"] }".to_string()),
+        ("yaserde".to_string(), YASERDE_PFORK_DEP.to_string()),
         ("validate".to_string(), "{ path = \"./../../validate\" }".to_string()),
     ];
     if code.contains("UtilsTupleIo")
@@ -30,7 +33,8 @@ pub fn generate_cargo_toml(code: &String, pname: &str, ftype: FileType) -> Strin
     if code.contains("UtilsDefaultSerde") {
         dep.push((
             "xsd-types".to_string(),
-            " { git = \"https://github.com/lumeohq/xsd-parser-rs\" }".to_string(),
+            XSD_PARSER_PFORK_DEP.to_string(),
+            // " { git = \"https://github.com/lumeohq/xsd-parser-rs\" }".to_string(),
         ));
     }
 
@@ -58,7 +62,8 @@ pub fn generate_cargo_toml(code: &String, pname: &str, ftype: FileType) -> Strin
         if mcn.contains("xsd-") {
             dep.push((
                 mcn.to_string(),
-                format!(" {{ git = \"https://github.com/lumeohq/xsd-parser-rs\" }}"),
+                format!("{}", XSD_PARSER_PFORK_DEP.to_string()),
+                // format!(" {{ git = \"https://github.com/lumeohq/xsd-parser-rs\" }}"),
             ));
         } else {
             match ftype {
