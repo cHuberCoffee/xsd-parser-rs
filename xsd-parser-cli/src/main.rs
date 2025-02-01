@@ -7,7 +7,10 @@ use std::{
 
 use anyhow::Context;
 use clap::Parser;
-use xsd_parser::{generator::{self, builder::GeneratorBuilder}, parser::parse};
+use xsd_parser::{
+    generator::{self, builder::GeneratorBuilder},
+    parser::parse,
+};
 
 #[derive(Parser)]
 #[clap(name = env!("CARGO_PKG_NAME"))]

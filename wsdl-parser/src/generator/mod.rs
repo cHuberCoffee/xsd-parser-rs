@@ -37,14 +37,17 @@ pub fn generate(definitions: &Definitions) -> String {
     res.join("")
 }
 
+const IMPL_IMPORT: &str = "use std::sync::{Arc, RwLock};
+// use crate::appstate::ApplicationState; // Change to reference the ApplicationState implementation\n\n";
+
 const IMPL_HEAD: &str = "pub trait MsgHandler {
-\tfn handler(&self) -> Result<String, String> {
+\tfn handler(&self, _state: Arc<RwLock<ApplicationState>>) -> Result<String, String> {
 \t\tErr(format!(\"Method {endp} not implemented\"))
 \t}
 }\n\n";
 
 const IMPL_BLOCK: &str = "impl MsgHandler for schema::{endp}::{funcname} {
-\t//fn handler(&self) -> Result<String, String> {
+\t//fn handler(&self, state: Arc<RwLock<ApplicationState>>) -> Result<String, String> {
 \t\t// FILL IN IMPLEMENTATION
 \t//}
 }\n";
@@ -64,7 +67,12 @@ pub fn generate_impl_template(definitions: &Definitions, endpoint: &str) -> Stri
     }
 
     let head = IMPL_HEAD.replace("{endp}", endpoint);
-    format!("{head}{blocks}", head = head, blocks = impl_blocks.join("\n"))
+    format!(
+        "{import}{head}{blocks}",
+        import = IMPL_IMPORT,
+        head = head,
+        blocks = impl_blocks.join("\n")
+    )
 }
 
 const DISP_HEAD: &str = "use yaserde::de::from_str;

@@ -137,7 +137,6 @@ fn process_single_file(
     Ok(())
 }
 
-
 fn load_file(path: &Path) -> std::io::Result<String> {
     let mut file = fs::File::open(path)?;
     let mut text = String::new();
